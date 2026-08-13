@@ -1,4 +1,5 @@
 import openeo
+import time
 import os
 
 # Conexión al backend de Copernicus Data Space Ecosystem
@@ -24,26 +25,43 @@ lago_amatitlan = {
 fechas_atitlan = [
     "2025-01-18", "2025-04-13", "2025-05-13", "2025-07-17",
     "2025-11-21", "2025-12-29", "2026-02-12", "2026-03-24",
-    "2026-04-13", "2026-04-28", "2026-07-22"
+    "2026-04-13", "2026-04-28", "2026-07-22",
 ]
 
-datacube = connection.load_collection(
-    "SENTINEL2_L2A",
-    spatial_extent=lago_atitlan,
-    temporal_extent=[fechas_atitlan[0], fechas_atitlan[-1]],
-    bands=["B03", "B04", "B08"]  # NDWI, NDVI, cianobacteria
-)
+fechas_amatitlan = [
+    "2025-01-28", "2025-04-15", "2025-04-28", "2025-11-24",
+    "2026-01-08", "2026-02-02", "2026-02-07", "2026-03-29",
+    "2026-04-13", "2026-04-28", "2026-06-19",
+]
 
-os.makedirs("data/atitlan", exist_ok=True)
+BANDAS = ["B03", "B04", "B08"]
 
-for fecha in fechas_atitlan:
-    cube = connection.load_collection(
-        "SENTINEL2_L2A",
-        spatial_extent=lago_atitlan,
-        temporal_extent=[fecha, fecha],
-        bands=["B03", "B04", "B08"]
-    )
-    cube.download(f"data/atitlan/{fecha}.tif")
-    print(f"Descargado {fecha}")
+def descargar_lago(nombre_lago, bbox, fechas, carpeta_salida):
+    os.makedirs(carpeta_salida, exist_ok=True)
 
-print(connection.describe_collection("SENTINEL2_L2A"))
+    for fecha in fechas:
+        ruta_salida = os.path.join(carpeta_salida, f"{fecha}.tif")
+
+        if os.path.exists(ruta_salida):
+            print(f"[{nombre_lago}] {fecha} ya existe, se omite.")
+            continue
+
+        try:
+            cube = connection.load_collection(
+                "SENTINEL2_L2A",
+                spatial_extent=bbox,
+                temporal_extent=[fecha, fecha],
+                bands=BANDAS,
+            )
+            cube.download(ruta_salida)
+            print(f"[{nombre_lago}] {fecha} descargado -> {ruta_salida}")
+
+        except Exception as e:
+            print(f"[{nombre_lago}] ERROR en {fecha}: {e}")
+
+        # pausa breve para no saturar la API
+        time.sleep(2)
+
+descargar_lago("Atitlan", lago_atitlan, fechas_atitlan, "data/atitlan")
+descargar_lago("Amatitlan", lago_amatitlan, fechas_amatitlan, "data/amatitlan")
+print("Descarga finalizada ☺")
