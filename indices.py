@@ -11,6 +11,9 @@ from sentinelhub import (
     BBox,
     bbox_to_dimensions,
 )
+from rasterio.transform import from_bounds
+
+
 
 load_dotenv()
 config = SHConfig()
@@ -24,6 +27,27 @@ if not config.sh_client_id or not config.sh_client_secret:
 
 config.sh_base_url = "https://sh.dataspace.copernicus.eu"
 config.sh_token_url = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+
+
+# ============================================================
+# COLECCION SENTINEL-2 PARA COPERNICUS DATA SPACE
+# ============================================================
+
+# Las colecciones predefinidas de sentinelhub pueden apuntar
+# al servidor tradicional de Sentinel Hub.
+# Creamos una variante que utilice explicitamente CDSE.
+SENTINEL2_L1C_CDSE = DataCollection.SENTINEL2_L1C.define_from(
+    "SENTINEL2_L1C_CDSE",
+    service_url=config.sh_base_url
+)
+
+print("Configuracion Sentinel Hub:")
+print(f"  Base URL: {config.sh_base_url}")
+print(f"  Token URL: {config.sh_token_url}")
+print(f"  Client ID cargado: {bool(config.sh_client_id)}")
+print(f"  Client Secret cargado: {bool(config.sh_client_secret)}")
+
+
 
 lago_atitlan = {
     "west": -91.326256,
@@ -39,20 +63,48 @@ lago_amatitlan = {
     "north": 14.493799
 }
 
+# fechas_atitlan = [
+#     "2025-01-18", "2025-04-13", "2025-05-13", 
+# ]
+# """ "2025-07-17",
+#     "2025-11-21", "2025-12-29", "2026-02-12", "2026-03-24",
+#     "2026-04-13", "2026-04-28", "2026-07-22", """
+
+# fechas_amatitlan = [
+#     "2025-01-28", "2025-04-15", "2025-04-28", 
+# ]
+
+# """ "2025-11-24",
+#     "2026-01-08", "2026-02-02", "2026-02-07", "2026-03-29",
+#     "2026-04-13", "2026-04-28", "2026-06-19", """
+
 fechas_atitlan = [
-    "2025-01-18", "2025-04-13", "2025-05-13", 
+    "2025-01-18",
+    "2025-04-13",
+    "2025-05-13",
+    "2025-07-17",
+    "2025-11-21",
+    "2025-12-29",
+    "2026-02-12",
+    "2026-03-24",
+    "2026-04-13",
+    "2026-04-28",
+    "2026-07-22",
 ]
-""" "2025-07-17",
-    "2025-11-21", "2025-12-29", "2026-02-12", "2026-03-24",
-    "2026-04-13", "2026-04-28", "2026-07-22", """
 
 fechas_amatitlan = [
-    "2025-01-28", "2025-04-15", "2025-04-28", 
+    "2025-01-28",
+    "2025-04-15",
+    "2025-04-28",
+    "2025-11-24",
+    "2026-01-08",
+    "2026-02-02",
+    "2026-02-07",
+    "2026-03-29",
+    "2026-04-13",
+    "2026-04-28",
+    "2026-06-19",
 ]
-
-""" "2025-11-24",
-    "2026-01-08", "2026-02-02", "2026-02-07", "2026-03-29",
-    "2026-04-13", "2026-04-28", "2026-06-19", """
 
 def calcular_ndvi_ndwi(ruta_tif):
     with rasterio.open(ruta_tif) as src:
@@ -133,7 +185,7 @@ def descargar_cianobacteria(bbox_dict, fecha, ruta_salida, resolucion=20):
         evalscript=EVALSCRIPT_CIANOBACTERIA,
         input_data=[
             SentinelHubRequest.input_data(
-                data_collection=DataCollection.SENTINEL2_L1C,
+                data_collection=SENTINEL2_L1C_CDSE,
                 time_interval=(fecha, fecha),
             )
         ],
@@ -144,15 +196,39 @@ def descargar_cianobacteria(bbox_dict, fecha, ruta_salida, resolucion=20):
     )
  
     resultado = request.get_data(save_data=False)[0]
- 
+
+    # Si Sentinel Hub devuelve H x W x 1, nos quedamos con una sola banda
+    if resultado.ndim == 3:
+        resultado = resultado[:, :, 0]
+
+    alto, ancho = resultado.shape
+
+    # Relacionamos los píxeles con las coordenadas reales del lago
+    transform = from_bounds(
+        bbox_dict["west"],
+        bbox_dict["south"],
+        bbox_dict["east"],
+        bbox_dict["north"],
+        ancho,
+        alto,
+    )
+
     os.makedirs(os.path.dirname(ruta_salida), exist_ok=True)
+
     with rasterio.open(
-        ruta_salida, "w",
-        driver="GTiff", height=resultado.shape[0], width=resultado.shape[1],
-        count=1, dtype="float32",
+        ruta_salida,
+        "w",
+        driver="GTiff",
+        height=alto,
+        width=ancho,
+        count=1,
+        dtype="float32",
+        crs="EPSG:4326",
+        transform=transform,
+        nodata=np.nan,
     ) as dst:
         dst.write(resultado.astype("float32"), 1)
- 
+
     print(f"Indice de cianobacteria guardado -> {ruta_salida}")
 
 def procesar_cianobacteria(nombre_lago, bbox_dict, fechas, carpeta_lago):
