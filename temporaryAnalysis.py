@@ -1,34 +1,51 @@
-"""
-Laboratorio 4 - Ejercicio 4
-Analisis temporal del indice de cianobacteria por lago.
-
-Requiere que ya existan los archivos *_cyano.tif generados en ejercicio 3
-(data/atitlan/*.tif y data/amatitlan/*.tif).
-
-Requisitos:
-    pip install rasterio numpy pandas matplotlib
-"""
-
 import os
 import numpy as np
 import pandas as pd
 import rasterio
 import matplotlib.pyplot as plt
 
+# fechas_atitlan = [
+#     "2025-01-18", "2025-04-13", "2025-05-13", 
+# ]
+# """ "2025-07-17",
+#     "2025-11-21", "2025-12-29", "2026-02-12", "2026-03-24",
+#     "2026-04-13", "2026-04-28", "2026-07-22", """
+
+# fechas_amatitlan = [
+#     "2025-01-28", "2025-04-15", "2025-04-28", 
+# ]
+
+# """ "2025-11-24",
+#     "2026-01-08", "2026-02-02", "2026-02-07", "2026-03-29",
+#     "2026-04-13", "2026-04-28", "2026-06-19", """
+
 fechas_atitlan = [
-    "2025-01-18", "2025-04-13", "2025-05-13", 
+    "2025-01-18",
+    "2025-04-13",
+    "2025-05-13",
+    "2025-07-17",
+    "2025-11-21",
+    "2025-12-29",
+    "2026-02-12",
+    "2026-03-24",
+    "2026-04-13",
+    "2026-04-28",
+    "2026-07-22",
 ]
-""" "2025-07-17",
-    "2025-11-21", "2025-12-29", "2026-02-12", "2026-03-24",
-    "2026-04-13", "2026-04-28", "2026-07-22", """
 
 fechas_amatitlan = [
-    "2025-01-28", "2025-04-15", "2025-04-28", 
+    "2025-01-28",
+    "2025-04-15",
+    "2025-04-28",
+    "2025-11-24",
+    "2026-01-08",
+    "2026-02-02",
+    "2026-02-07",
+    "2026-03-29",
+    "2026-04-13",
+    "2026-04-28",
+    "2026-06-19",
 ]
-
-""" "2025-11-24",
-    "2026-01-08", "2026-02-02", "2026-02-07", "2026-03-29",
-    "2026-04-13", "2026-04-28", "2026-06-19", """
 
 # ---------------------------------------------------------------------------
 # 1. Indice promedio de cianobacteria por lago y por fecha
@@ -77,9 +94,20 @@ df_amatitlan["lago"] = "Amatitlan"
 
 df_temporal = pd.concat([df_atitlan, df_amatitlan], ignore_index=True)
 
-os.makedirs("resultados", exist_ok=True)
-df_temporal.to_csv("resultados/indice_cianobacteria_temporal.csv", index=False)
-print("Tabla guardada en resultados/indice_cianobacteria_temporal.csv")
+# Carpetas para guardar resultados
+CARPETA_TABLAS = "resultados/tablas"
+CARPETA_FIGURAS_TEMPORAL = "resultados/figuras/temporal"
+
+os.makedirs(CARPETA_TABLAS, exist_ok=True)
+os.makedirs(CARPETA_FIGURAS_TEMPORAL, exist_ok=True)
+
+df_temporal.to_csv(
+    os.path.join(CARPETA_TABLAS, "indice_cianobacteria_temporal.csv"),
+    index=False
+)
+
+print("Tabla guardada en resultados/tablas/indice_cianobacteria_temporal.csv")
+# print("Tabla guardada en resultados/indice_cianobacteria_temporal.csv")
 print(df_temporal)
 
 # ---------------------------------------------------------------------------
@@ -92,12 +120,18 @@ for lago, df_lago in df_temporal.groupby("lago"):
 
 ax.set_title("Evolucion temporal del indice de cianobacteria (chl-a)")
 ax.set_xlabel("Fecha")
-ax.set_ylabel("Indice promedio de cianobacteria (chl-a, ug/m3)")
+ax.set_ylabel("Clorofila-a estimada (mg/m³)")
 ax.legend()
 ax.grid(alpha=0.3)
 fig.autofmt_xdate()
 fig.tight_layout()
-fig.savefig("resultados/evolucion_temporal_cianobacteria.png", dpi=150)
+fig.savefig(
+    os.path.join(
+        CARPETA_FIGURAS_TEMPORAL,
+        "evolucion_temporal_cianobacteria.png"
+    ),
+    dpi=150
+)
 print("Grafico guardado en resultados/evolucion_temporal_cianobacteria.png")
 
 # ---------------------------------------------------------------------------
