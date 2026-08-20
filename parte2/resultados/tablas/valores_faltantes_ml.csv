@@ -1,0 +1,14 @@
+variable,pct_faltante
+lon,0.0
+lat,0.0
+ndvi,0.0
+ndwi,0.0
+cyano_index,0.0
+B02,0.0
+B03,0.0
+B04,0.0
+B05,0.0
+B08,0.0
+B11,0.0
+lago,0.0
+fecha,0.0
