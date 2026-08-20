@@ -315,6 +315,167 @@ def resumen_dataset(df):
     return faltantes
 
 
+# ============================================================
+# 1.5 ANALISIS EXPLORATORIO
+# ============================================================
+
+CARPETA_FIGURAS_EDA = os.path.join(CARPETA_RESULTADOS, "figuras", "eda")
+
+VARIABLES_NUMERICAS_EDA = [
+    "ndvi", "ndwi", "cyano_index", "B02", "B03", "B04", "B05", "B08", "B11"
+]
+
+
+def analisis_exploratorio(df):
+    """
+    Genera estadisticas descriptivas y visualizaciones de las variables
+    que se usaran para construir los modelos (NDVI, NDWI, cyano_index y
+    bandas espectrales), tanto de forma global como por lago.
+    """
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    os.makedirs(CARPETA_FIGURAS_EDA, exist_ok=True)
+
+    # --- Estadisticas descriptivas ---
+    descriptivas = df[VARIABLES_NUMERICAS_EDA].describe().T
+    descriptivas.to_csv(os.path.join(CARPETA_TABLAS, "estadisticas_descriptivas_eda.csv"))
+    print("\n--- Estadisticas descriptivas (todas las observaciones) ---")
+    print(descriptivas.to_string())
+
+    descriptivas_por_lago = df.groupby("lago")[VARIABLES_NUMERICAS_EDA].describe()
+    descriptivas_por_lago.to_csv(os.path.join(CARPETA_TABLAS, "estadisticas_descriptivas_por_lago.csv"))
+
+    # --- Histogramas de ndvi, ndwi y cyano_index ---
+    # cyano_index se recorta al percentil 1-99 solo para la visualizacion
+    # (no para los datos en si), ya que la regresion cubica NDCI produce
+    # unos pocos valores extremos no acotados que saturan la escala del
+    # histograma (ver Decision 8 en imprimir_decisiones()).
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+    for ax, col in zip(axes, ["ndvi", "ndwi", "cyano_index"]):
+        valores = df[col].dropna()
+        if col == "cyano_index":
+            p1, p99 = valores.quantile([0.01, 0.99])
+            valores = valores.clip(p1, p99)
+        ax.hist(valores, bins=60, color="#2b7a78")
+        ax.set_title(f"Distribucion de {col}" + (" (recortado P1-P99)" if col == "cyano_index" else ""))
+        ax.set_xlabel(col)
+        ax.set_ylabel("Frecuencia")
+    fig.tight_layout()
+    ruta_hist = os.path.join(CARPETA_FIGURAS_EDA, "histogramas_indices.png")
+    fig.savefig(ruta_hist, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Histogramas guardados -> {ruta_hist}")
+
+    # --- Boxplot de cyano_index por lago (escala log para visibilidad) ---
+    fig, ax = plt.subplots(figsize=(6, 5))
+    datos_boxplot = [
+        df.loc[df["lago"] == lago, "cyano_index"].clip(lower=0.01)
+        for lago in df["lago"].unique()
+    ]
+    ax.boxplot(datos_boxplot, tick_labels=df["lago"].unique(), showfliers=False)
+    ax.set_yscale("log")
+    ax.set_title("Distribucion de cyano_index por lago (escala log, sin outliers)")
+    ax.set_ylabel("cyano_index (clorofila-a estimada, ug/L)")
+    fig.tight_layout()
+    ruta_box = os.path.join(CARPETA_FIGURAS_EDA, "boxplot_cyano_por_lago.png")
+    fig.savefig(ruta_box, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Boxplot por lago guardado -> {ruta_box}")
+
+    # --- Matriz de correlacion entre variables numericas ---
+    corr = df[VARIABLES_NUMERICAS_EDA].corr()
+    corr.to_csv(os.path.join(CARPETA_TABLAS, "correlacion_variables_eda.csv"))
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    im = ax.imshow(corr.values, cmap="RdBu_r", vmin=-1, vmax=1)
+    ax.set_xticks(range(len(corr.columns)))
+    ax.set_xticklabels(corr.columns, rotation=45, ha="right")
+    ax.set_yticks(range(len(corr.columns)))
+    ax.set_yticklabels(corr.columns)
+    for i in range(len(corr.columns)):
+        for j in range(len(corr.columns)):
+            ax.text(j, i, f"{corr.values[i, j]:.2f}", ha="center", va="center", fontsize=7)
+    fig.colorbar(im, ax=ax, label="Correlacion")
+    ax.set_title("Correlacion entre variables espectrales e indices")
+    fig.tight_layout()
+    ruta_corr = os.path.join(CARPETA_FIGURAS_EDA, "correlacion_variables.png")
+    fig.savefig(ruta_corr, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Matriz de correlacion guardada -> {ruta_corr}")
+
+    return descriptivas, corr
+
+
+# ============================================================
+# 1.6 DECISIONES DE PREPARACION Y LIMPIEZA
+# ============================================================
+
+DECISIONES_PREPARACION = """
+--- Decisiones tomadas durante la preparacion y limpieza de los datos ---
+
+1. Fuente de los datos: se mantienen exactamente los mismos lagos,
+   bounding boxes y fechas usados en la Parte I (ver indices.py), para
+   que el analisis de la Parte 2 sea directamente comparable con el de
+   la Parte 1.
+
+2. Extraccion sin rasterio: en el equipo usado para este avance,
+   rasterio/GDAL esta bloqueado por una politica de Control de
+   aplicaciones de Windows (WDAC) al nivel de sistema operativo (no es
+   un problema de dependencias de Python). Por eso, en vez de descargar
+   .tif y leerlos con rasterio como en indices.py, se piden los
+   arreglos directamente a la API de Sentinel Hub (numpy en memoria) y
+   las coordenadas de cada pixel se calculan por interpolacion lineal
+   a partir del bounding box, lo cual es equivalente a la
+   transformacion afin que usaria rasterio para georreferenciar.
+
+3. Resolucion espacial (50 m): se redujo de 20 m (usados para los
+   mapas de la Parte I) a 50 m para mantener manejable el volumen de
+   datos descargados via API dentro del tiempo disponible, conservando
+   suficiente densidad de pixeles por bloque de ~1 km x 1 km
+   (Ejercicio 6: ~20x20 pixeles por bloque a esta resolucion).
+
+4. Mascara de agua: se usa el mismo criterio WBI (indice booleano de
+   agua) que la Parte I para descartar pixeles fuera del lago (tierra,
+   vegetacion ribereña, nubes sobre tierra), en vez de recortar por un
+   poligono fijo, porque el area de agua cambia ligeramente entre
+   fechas (nivel del lago, nubes).
+
+5. Valores no finitos: se descartan filas con NaN/Inf en ndvi, ndwi o
+   cyano_index. Estos casos corresponden a division por cero (por
+   ejemplo B08+B04=0) o a pixeles marcados como no-agua por la
+   evalscript (que devuelve NaN explicitamente en esos casos).
+
+6. Rango fisico valido: se descartan pixeles con ndvi o ndwi fuera de
+   [-1, 1], el rango matematicamente valido de estos indices; en la
+   practica esto elimino un numero minimo de filas (ver conteo en la
+   funcion limpiar_dataset), confirmando que la mascara de agua ya
+   habia retirado la mayoria de los pixeles problematicos.
+
+7. cyano_index como clorofila-a estimada: se conserva la formula NDCI
+   original de Mishra & Mishra (2012) usada en la Parte I, sin
+   recalibrar, para mantener consistencia con los resultados ya
+   obtenidos (resultados/*.csv de la Parte I).
+
+8. Valores extremos de cyano_index: al trabajar a nivel de pixel (en
+   vez de promedios por fecha como en la Parte I) se observan valores
+   minimos/maximos fuera del rango tipico reportado en Parte I
+   (ver estadisticas_descriptivas_eda.csv). Esto ocurre porque la
+   regresion cubica NDCI->clorofila-a no esta acotada y unos pocos
+   pixeles de agua con NDCI cercano a los extremos matematicos
+   producen valores extremos. Se documenta como limitacion conocida
+   (ver Ejercicio 10.2) en vez de recortarse arbitrariamente, para no
+   introducir un sesgo adicional no justificado en la variable
+   respuesta antes del Ejercicio 2.
+"""
+
+
+def imprimir_decisiones():
+    print(DECISIONES_PREPARACION)
+
+
 if __name__ == "__main__":
     crear_carpetas()
 
@@ -341,3 +502,6 @@ if __name__ == "__main__":
         ruta_faltantes, index=False
     )
     print(f"Tabla de valores faltantes guardada -> {ruta_faltantes}")
+
+    analisis_exploratorio(df_limpio)
+    imprimir_decisiones()
