@@ -1,0 +1,7 @@
+variable,descripcion
+ndvi,"Indice de vegetacion de diferencia normalizada. Aunque fue disenado para vegetacion terrestre, sobre cuerpos de agua valores de NDVI menos negativos/positivos pueden indicar vegetacion acuatica flotante o acumulaciones algales superficiales densas."
+ndwi,"Indice de agua de diferencia normalizada. Indica el grado de 'pureza' espectral del agua; caidas en NDWI dentro del cuerpo de agua pueden reflejar interferencia de material en suspension, incluidas floraciones algales."
+B02,Banda azul (490 nm). Sensible a dispersion por particulas finas en suspension y turbidez del agua; ayuda a distinguir aguas claras de aguas con alta carga de solidos/algas.
+B03,Banda verde (560 nm). Es la banda mas sensible a la reflectancia de la clorofila-a en el agua; valores altos de reflectancia verde suelen asociarse a mayor biomasa algal.
+B08,"Banda infrarroja cercana (NIR, 842 nm). El agua absorbe fuertemente el NIR, pero la presencia de biomasa algal o material organico en la superficie aumenta la reflectancia NIR respecto a agua limpia; util para detectar acumulaciones superficiales densas."
+B11,"Banda infrarroja de onda corta (SWIR1, 1610 nm). Aporta informacion sobre contenido de humedad/materia organica y ayuda a discriminar agua de vegetacion flotante o sedimentos."
