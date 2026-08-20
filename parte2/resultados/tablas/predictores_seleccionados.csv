@@ -5,3 +5,6 @@ B02,Banda azul (490 nm). Sensible a dispersion por particulas finas en suspensio
 B03,Banda verde (560 nm). Es la banda mas sensible a la reflectancia de la clorofila-a en el agua; valores altos de reflectancia verde suelen asociarse a mayor biomasa algal.
 B08,"Banda infrarroja cercana (NIR, 842 nm). El agua absorbe fuertemente el NIR, pero la presencia de biomasa algal o material organico en la superficie aumenta la reflectancia NIR respecto a agua limpia; util para detectar acumulaciones superficiales densas."
 B11,"Banda infrarroja de onda corta (SWIR1, 1610 nm). Aporta informacion sobre contenido de humedad/materia organica y ayuda a discriminar agua de vegetacion flotante o sedimentos."
+ratio_verde_azul,B03/B02. Proxy alternativo (no basado en B04/B05) de biomasa algal: la clorofila-a incrementa la reflectancia verde relativa a la azul.
+brillo_superficial,"Promedio de B02, B03 y B08. Floraciones densas en superficie tienden a elevar la reflectancia total respecto a agua limpia."
+indice_turbidez_verde_swir,"(B03-B11)/(B03+B11). Contraste entre la banda mas sensible a pigmentos (verde) y la banda sensible a materia organica/humedad (SWIR1), como proxy adicional de turbidez."

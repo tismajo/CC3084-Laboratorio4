@@ -66,15 +66,70 @@ def construir_conjunto_predictores(df):
     return columnas_predictoras
 
 
+# ============================================================
+# 3.3 INGENIERIA DE CARACTERISTICAS
+# ============================================================
+# Nuevas variables construidas exclusivamente a partir de bandas que SI
+# pueden usarse como predictoras (no involucran B04 ni B05), pensadas
+# para resaltar contraste espectral asociado a biomasa algal en
+# superficie sin reproducir la formula de la variable respuesta.
+
+RUTA_SALIDA = "parte2/resultados/dataset_features.csv"
+
+
+def construir_features_adicionales(df):
+    df = df.copy()
+
+    # Razon verde/azul: la clorofila-a incrementa la reflectancia verde
+    # relativa a la azul: util como proxy de biomasa algal alternativo a
+    # NDCI, sin usar B04/B05.
+    df["ratio_verde_azul"] = df["B03"] / df["B02"].replace(0, pd.NA)
+
+    # Indice de brillo superficial en el visible+NIR: floraciones densas
+    # en superficie suelen elevar la reflectancia total respecto a agua
+    # limpia.
+    df["brillo_superficial"] = (df["B02"] + df["B03"] + df["B08"]) / 3
+
+    # Diferencia normalizada verde-SWIR1 (similar en espiritu a un
+    # indice de turbidez): contraste entre banda mas sensible a
+    # pigmentos (verde) y banda sensible a materia organica/humedad
+    # (SWIR1).
+    denom = (df["B03"] + df["B11"]).replace(0, pd.NA)
+    df["indice_turbidez_verde_swir"] = (df["B03"] - df["B11"]) / denom
+
+    return df
+
+
+DESCRIPCION_FEATURES_NUEVAS = {
+    "ratio_verde_azul": "B03/B02. Proxy alternativo (no basado en "
+                         "B04/B05) de biomasa algal: la clorofila-a "
+                         "incrementa la reflectancia verde relativa a "
+                         "la azul.",
+    "brillo_superficial": "Promedio de B02, B03 y B08. Floraciones "
+                           "densas en superficie tienden a elevar la "
+                           "reflectancia total respecto a agua limpia.",
+    "indice_turbidez_verde_swir": "(B03-B11)/(B03+B11). Contraste entre "
+                                   "la banda mas sensible a pigmentos "
+                                   "(verde) y la banda sensible a "
+                                   "materia organica/humedad (SWIR1), "
+                                   "como proxy adicional de turbidez.",
+}
+
+
 if __name__ == "__main__":
     os.makedirs(CARPETA_TABLAS, exist_ok=True)
 
     df = cargar_dataset()
+    df = construir_features_adicionales(df)
+    df.to_csv(RUTA_SALIDA, index=False)
+    print(f"Dataset con features guardado -> {RUTA_SALIDA}")
+
     predictores = construir_conjunto_predictores(df)
+    todas_descripciones = {**DESCRIPCION_PREDICTORES, **DESCRIPCION_FEATURES_NUEVAS}
 
     print("\n--- Variables predictoras seleccionadas ---")
     for p in predictores:
-        print(f"- {p}: {DESCRIPCION_PREDICTORES.get(p, '(banda espectral cruda)')}")
+        print(f"- {p}: {todas_descripciones.get(p, '(banda espectral cruda)')}")
 
     print("\n--- Variables excluidas por posible fuga de informacion ---")
     for c in COLUMNAS_EXCLUIDAS_FUGA:
@@ -82,7 +137,7 @@ if __name__ == "__main__":
 
     tabla_predictores = pd.DataFrame({
         "variable": predictores,
-        "descripcion": [DESCRIPCION_PREDICTORES.get(p, "banda espectral cruda de Sentinel-2") for p in predictores],
+        "descripcion": [todas_descripciones.get(p, "banda espectral cruda de Sentinel-2") for p in predictores],
     })
     tabla_predictores.to_csv(os.path.join(CARPETA_TABLAS, "predictores_seleccionados.csv"), index=False)
     print(f"\nTabla de predictores guardada -> {os.path.join(CARPETA_TABLAS, 'predictores_seleccionados.csv')}")
