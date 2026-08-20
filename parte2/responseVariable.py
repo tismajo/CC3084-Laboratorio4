@@ -79,6 +79,108 @@ def distribucion_global(df):
     return resumen
 
 
+# ============================================================
+# 2.3 DISTRIBUCION POR LAGO Y POR FECHA
+# ============================================================
+
+def distribucion_por_lago(df):
+    tabla = (
+        df.groupby("lago")["alta_cianobacteria"]
+        .agg(n_observaciones="count", n_positivos="sum", tasa_positivos="mean")
+        .reset_index()
+    )
+    tabla["tasa_positivos"] = (tabla["tasa_positivos"] * 100).round(3)
+
+    print("\n--- Distribucion de la variable respuesta por lago ---")
+    print(tabla.to_string(index=False))
+
+    return tabla
+
+
+def distribucion_por_fecha(df):
+    tabla = (
+        df.groupby(["lago", "fecha"])["alta_cianobacteria"]
+        .agg(n_observaciones="count", n_positivos="sum", tasa_positivos="mean")
+        .reset_index()
+    )
+    tabla["tasa_positivos"] = (tabla["tasa_positivos"] * 100).round(3)
+
+    print("\n--- Distribucion de la variable respuesta por fecha ---")
+    print(tabla.to_string(index=False))
+
+    return tabla
+
+
+# ============================================================
+# 2.4 DESBALANCE DE CLASES
+# ============================================================
+
+def analizar_desbalance(resumen_global):
+    fila_0 = resumen_global[resumen_global["clase"] == 0]
+    fila_1 = resumen_global[resumen_global["clase"] == 1]
+
+    n0 = int(fila_0["n_observaciones"].iloc[0]) if not fila_0.empty else 0
+    n1 = int(fila_1["n_observaciones"].iloc[0]) if not fila_1.empty else 0
+
+    razon = (n0 / n1) if n1 > 0 else float("inf")
+
+    print("\n--- Desbalance de clases ---")
+    print(f"Clase 0 (ausencia/baja): {n0} observaciones")
+    print(f"Clase 1 (alta presencia): {n1} observaciones")
+    print(f"Razon clase mayoritaria / minoritaria: {razon:.2f} : 1")
+    print(
+        "\nConsecuencias esperadas: con este nivel de desbalance, un modelo "
+        "entrenado sin ajustes puede maximizar accuracy prediciendo "
+        "casi siempre la clase mayoritaria (0), logrando accuracy alto pero "
+        "recall muy bajo para la clase de interes (1 = alta cianobacteria), "
+        "que es precisamente la clase que mas importa detectar desde el "
+        "punto de vista de salud publica. Esto exige usar metricas "
+        "sensibles al desbalance (recall, F1, ROC-AUC, PR-AUC) en vez de "
+        "accuracy, y considerar tecnicas de balanceo (class_weight, "
+        "sobremuestreo/submuestreo) al entrenar los modelos en el "
+        "Ejercicio 4."
+    )
+
+    return {"n_clase_0": n0, "n_clase_1": n1, "razon_desbalance": razon}
+
+
+# ============================================================
+# 2.5 VARIABLES QUE NO PUEDEN USARSE COMO PREDICTORAS
+# ============================================================
+
+VARIABLES_EXCLUIDAS_POR_FUGA = {
+    "cyano_index": (
+        "Es la variable continua a partir de la cual se construye "
+        "directamente la variable respuesta (alta_cianobacteria)."
+    ),
+    "B04": (
+        "Banda roja usada directamente en el calculo de NDCI "
+        "(NDCI = (B05-B04)/(B05+B04)), que alimenta la formula cubica "
+        "con la que se calcula cyano_index. Usarla como predictor "
+        "permitiria al modelo reconstruir casi exactamente la etiqueta."
+    ),
+    "B05": (
+        "Banda de borde rojo (red edge) usada directamente en el "
+        "calculo de NDCI, con el mismo problema de fuga que B04."
+    ),
+}
+
+NOTA_NDVI = (
+    "NDVI se calcula con B04 y B08 (misma B04 que interviene en NDCI), "
+    "pero NDVI es una transformacion distinta a NDCI y no reproduce la "
+    "relacion cubica NDCI->clorofila-a con la que se define la etiqueta; "
+    "se mantiene como predictor valido, documentando este riesgo menor "
+    "de colinealidad indirecta con la respuesta."
+)
+
+
+def imprimir_variables_excluidas():
+    print("\n--- Variables excluidas como predictoras (fuga de informacion) ---")
+    for variable, motivo in VARIABLES_EXCLUIDAS_POR_FUGA.items():
+        print(f"- {variable}: {motivo}")
+    print(f"\nNota sobre NDVI: {NOTA_NDVI}")
+
+
 if __name__ == "__main__":
     os.makedirs(CARPETA_TABLAS, exist_ok=True)
 
@@ -91,3 +193,13 @@ if __name__ == "__main__":
 
     resumen_global = distribucion_global(df)
     resumen_global.to_csv(os.path.join(CARPETA_TABLAS, "distribucion_respuesta_global.csv"), index=False)
+
+    tabla_lago = distribucion_por_lago(df)
+    tabla_lago.to_csv(os.path.join(CARPETA_TABLAS, "distribucion_respuesta_por_lago.csv"), index=False)
+
+    tabla_fecha = distribucion_por_fecha(df)
+    tabla_fecha.to_csv(os.path.join(CARPETA_TABLAS, "distribucion_respuesta_por_fecha.csv"), index=False)
+
+    analizar_desbalance(resumen_global)
+
+    imprimir_variables_excluidas()
