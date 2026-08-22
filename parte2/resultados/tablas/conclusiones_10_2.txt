@@ -1,0 +1,44 @@
+
+--- 10.2 Limitaciones encontradas durante el desarrollo del modelo ---
+
+  - Cantidad y espaciamiento de fechas: solo 11 fechas por lago,
+    distribuidas de forma irregular a lo largo de ~1.5 anios (algunas
+    con varios meses de separacion), lo que limita la capacidad del
+    modelo para capturar la dinamica temporal completa de las
+    floraciones (aparicion, pico, disipacion) y probablemente deja
+    fuera eventos de floracion breves entre fechas de captura.
+
+  - Nubosidad y pixeles invalidos: varias fechas muestran menos
+    pixeles de agua validos que otras (ver Ejercicio 1.4), reflejo de
+    interferencia de nubes o condiciones atmosfericas, lo que reduce
+    de forma desigual la cantidad de evidencia disponible por fecha.
+
+  - Resolucion espacial reducida (50m vs 20m de la Parte I): fue una
+    decision practica (Ejercicio 1.6) para mantener manejable el
+    volumen de descarga via API; esto pudo suavizar/perder patrones
+    finos de floracion que si eran visibles en los mapas de mayor
+    resolucion de la Parte I.
+
+  - Diferencias extremas entre lagos: Atitlan tiene apenas
+    322 pixeles positivos en toda la
+    serie (tasa de positivos 0.060%)
+    frente a una tasa mucho mayor en Amatitlan, lo que hace que
+    cualquier metrica agregada este dominada por Amatitlan y que el
+    modelo tenga muy poca senal para aprender floraciones raras en
+    Atitlan.
+
+  - Metodologia de validacion: la validacion aleatoria (Ejercicio 5)
+    sobreestima el desempeno respecto a la validacion espacial
+    (Ejercicio 6, 266 bloques en Atitlan y
+    50 en Amatitlan) debido a autocorrelacion
+    espacial entre pixeles vecinos; y el modelo no generaliza entre
+    lagos (Ejercicio 7), por lo que las metricas reportadas solo son
+    validas para el lago en el que se entreno el modelo.
+
+  - cyano_index como proxy, no medicion directa: el indice de
+    cianobacteria usado como base de la variable respuesta es un
+    proxy espectral (NDCI, Mishra & Mishra 2012) y no una medicion de
+    laboratorio de microcistinas o conteo celular real, por lo que
+    hereda las limitaciones de cualquier estimacion remota
+    (posibles valores extremos no acotados, ver Ejercicio 1.6 decision
+    8).
