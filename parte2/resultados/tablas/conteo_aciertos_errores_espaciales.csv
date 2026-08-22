@@ -1,0 +1,9 @@
+lago,fecha,categoria,n
+Atitlan,2026-07-22,TN (acierto en baja presencia),48721
+Atitlan,2026-07-22,TP (acierto en alta presencia),75
+Atitlan,2026-07-22,FP (falsa alarma),43
+Atitlan,2026-07-22,FN (no detectada),6
+Amatitlan,2026-06-19,TP (acierto en alta presencia),3131
+Amatitlan,2026-06-19,TN (acierto en baja presencia),2348
+Amatitlan,2026-06-19,FP (falsa alarma),364
+Amatitlan,2026-06-19,FN (no detectada),24
