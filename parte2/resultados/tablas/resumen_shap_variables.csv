@@ -1,0 +1,10 @@
+variable,importancia_media_abs_shap,correlacion_valor_vs_shap,direccion
+ratio_verde_azul,6.1284785,0.956381626426288,valores altos -> mayor prob. alta cianobacteria
+ndvi,2.7912827,0.6722686782765586,valores altos -> mayor prob. alta cianobacteria
+B02,1.0133047,-0.4657764676177768,valores altos -> menor prob. alta cianobacteria
+brillo_superficial,0.8159037,0.4653268172916965,valores altos -> mayor prob. alta cianobacteria
+ndwi,0.7829701,0.900756684021978,valores altos -> mayor prob. alta cianobacteria
+B03,0.6989385,0.21492647386866512,valores altos -> mayor prob. alta cianobacteria
+B11,0.63839585,-0.1442434837114252,valores altos -> menor prob. alta cianobacteria
+indice_turbidez_verde_swir,0.52084684,0.039071483907735,valores altos -> mayor prob. alta cianobacteria
+B08,0.33472493,-0.1581364804067413,valores altos -> menor prob. alta cianobacteria
