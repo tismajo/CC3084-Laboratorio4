@@ -1,0 +1,25 @@
+
+--- 10.1 Capacidad del modelo como herramienta de apoyo ---
+
+El modelo final (XGBoost, seleccionado en el Ejercicio 5.3 por
+priorizar recall) alcanza en el conjunto de prueba (division aleatoria
+70/30): recall=0.938, precision=0.787,
+F1=0.855, ROC-AUC=0.999. Bajo validacion
+espacial (GroupKFold por bloque de 1km, Ejercicio 6), el recall se
+mantiene alto (0.922), lo que indica que el
+modelo SI tiene capacidad util como herramienta de APOYO al monitoreo:
+detecta la gran mayoria de las zonas con alta presencia de
+cianobacteria (pocos falsos negativos, el error mas costoso desde el
+punto de vista de salud publica segun el Ejercicio 5.3), a costa de
+generar tambien falsas alarmas que un equipo humano deberia poder
+descartar con una verificacion rapida.
+
+Sin embargo, esta capacidad es claramente condicional: el modelo
+funciona bien DENTRO de un mismo lago y con datos de la misma
+distribucion con la que fue entrenado, pero el Ejercicio 7 mostro que
+NO generaliza de un lago a otro (recall tan bajo como 0.001-0.19 en
+los experimentos cruzados). Por lo tanto, el modelo es util como
+apoyo al monitoreo SIEMPRE que se entrene y aplique de forma
+especifica para cada lago, y no deberia usarse como sustituto de
+muestreos fisicos de confirmacion, sino como sistema de priorizacion
+de zonas a inspeccionar.
