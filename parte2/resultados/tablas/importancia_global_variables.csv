@@ -1,0 +1,10 @@
+variable,importancia
+ratio_verde_azul,0.7937785
+ndvi,0.084979065
+ndwi,0.032125473
+B02,0.029119523
+B03,0.014279064
+B08,0.012965688
+indice_turbidez_verde_swir,0.01119269
+B11,0.010828477
+brillo_superficial,0.010731484
