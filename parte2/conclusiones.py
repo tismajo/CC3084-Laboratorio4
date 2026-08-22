@@ -119,6 +119,60 @@ def limitaciones(distribucion_lago, bloques):
     return texto
 
 
+# ============================================================
+# 10.3 DATOS ADICIONALES QUE PODRIAN MEJORAR EL MODELO
+# ============================================================
+
+MEJORAS_FUTURAS = """
+--- 10.3 Informacion adicional que podria mejorar el modelo ---
+
+  - Variables meteorologicas: precipitacion y temperatura (ver los
+    dos enlaces de weatherspark.com sugeridos en el enunciado del
+    laboratorio para Amatitlan y Santiago Atitlan) podrian explicar
+    parte de la variabilidad temporal de las floraciones (lluvias que
+    arrastran nutrientes, temperaturas calidas que favorecen el
+    crecimiento algal), y ayudarian especialmente a modelar la
+    dinamica temporal que el dataset actual (solo 11 fechas por lago)
+    no puede capturar bien.
+
+  - Variables hidrologicas: nivel del lago, tiempo de residencia del
+    agua, aportes de rios/afluentes y descargas de aguas residuales
+    (relevante sobre todo para Amatitlan, con fuerte influencia
+    urbana) aportarian contexto sobre la carga de nutrientes que
+    impulsa las floraciones, mas alla de lo que puede inferirse solo
+    de la reflectancia superficial.
+
+  - Mayor frecuencia temporal: imagenes con cadencia semanal (en vez
+    de la actual, con huecos de varios meses) permitirian capturar el
+    ciclo completo de una floracion (inicio, pico, disipacion) y
+    entrenar modelos que tambien usen informacion temporal (por
+    ejemplo, tendencia de los ultimos dias) como predictor.
+
+  - Muestreos fisicos de calibracion: mediciones de laboratorio de
+    clorofila-a, ficocianina o conteo de celulas de cianobacterias en
+    puntos conocidos permitirian calibrar y validar el proxy espectral
+    NDCI actualmente usado (Ejercicio 1.6, decision 7-8), en vez de
+    depender unicamente de un modelo empirico generico no ajustado
+    especificamente a estos dos lagos.
+
+  - Bandas espectrales adicionales: incorporar bandas de borde rojo
+    adicionales (B06, B07) o indices especificos de ficocianina
+    (pigmento distintivo de cianobacterias, a diferencia de la
+    clorofila-a que comparten con otras algas) podria mejorar la
+    especificidad de la deteccion.
+
+  - Modelos y umbrales especificos por lago: dado que el Ejercicio 7
+    mostro que un unico modelo no generaliza entre lagos, una mejora
+    natural es entrenar (o al menos recalibrar el umbral de decision
+    de) un modelo independiente para cada lago, en vez de buscar un
+    unico modelo universal.
+"""
+
+
+def imprimir_mejoras_futuras():
+    print(MEJORAS_FUTURAS)
+
+
 if __name__ == "__main__":
     metricas, cv_comparacion, generalizacion, distribucion_lago, bloques = cargar_resumenes()
 
@@ -131,3 +185,8 @@ if __name__ == "__main__":
 
     with open(os.path.join(CARPETA_TABLAS, "conclusiones_10_2.txt"), "w", encoding="utf-8") as f:
         f.write(texto_102)
+
+    imprimir_mejoras_futuras()
+
+    with open(os.path.join(CARPETA_TABLAS, "conclusiones_10_3.txt"), "w", encoding="utf-8") as f:
+        f.write(MEJORAS_FUTURAS)
