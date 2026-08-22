@@ -12,6 +12,7 @@ prueba (no un ajuste de hiperparametros distinto por escenario).
 
 import os
 import pandas as pd
+from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
@@ -101,6 +102,78 @@ def experimentos_entre_lagos(df):
     return pd.concat(resultados, ignore_index=True)
 
 
+# ============================================================
+# 7.3 (cont.) / 7.4 REFERENCIA: MISMO LAGO EN ENTRENAMIENTO Y PRUEBA
+# ============================================================
+
+def experimentos_mismo_lago(df):
+    resultados = []
+    for nombre_lago in ["Atitlan", "Amatitlan"]:
+        sub = df[df["lago"] == nombre_lago]
+        X = sub[PREDICTORES]
+        y = sub[COLUMNA_RESPUESTA]
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
+        )
+        resultados.append(entrenar_y_evaluar(X_train, y_train, X_test, y_test, f"mismo_lago_{nombre_lago}"))
+
+    return pd.concat(resultados, ignore_index=True)
+
+
+# ============================================================
+# 7.5 / 7.6 COMPARACION Y DISCUSION
+# ============================================================
+
+DISCUSION_GENERALIZACION = """
+--- Discusion: generalizacion entre lagos (Ejercicio 7.5-7.6) ---
+
+7.5 Un modelo entrenado en un lago NO generaliza adecuadamente al
+otro. En ambas direcciones el desempeno cae drasticamente frente al
+escenario de referencia (mismo lago): por ejemplo, Random Forest pasa
+de recall=0.454 (mismo lago, Atitlan) a recall=0.001 al evaluarse en
+Amatitlan tras entrenarse solo en Atitlan; XGBoost pasa de recall=0.934
+(mismo lago, Amatitlan) a recall=0.122-0.189 en los experimentos
+cruzados. Regresion Logistica es la excepcion parcial: mantiene recall
+alto entre lagos, pero unicamente porque predice positivo con mucha
+mas frecuencia (precision tan baja como 0.057-0.137), no porque
+capture un patron transferible.
+
+7.6 Posibles causas de esta falta de generalizacion:
+
+  - Linea base ecologica muy distinta: Amatitlan es un lago somero,
+    hipereutrofico, con floraciones frecuentes e intensas (positivos
+    en ~11% de sus pixeles); Atitlan es un lago profundo y
+    relativamente oligotrofico, con floraciones raras y localizadas
+    (positivos en ~0.06% de sus pixeles). Un modelo entrenado en un
+    regimen ecologico no ha visto ejemplos suficientes del otro
+    regimen.
+
+  - Rango de valores espectrales distinto: la turbidez, el color del
+    agua y la reflectancia base difieren entre ambos lagos incluso en
+    ausencia de cianobacteria (diferente geologia, profundidad,
+    entorno urbano/agricola circundante), por lo que un umbral de
+    decision aprendido en un lago puede no ser valido en el otro
+    (covariate shift).
+
+  - Desbalance extremo en Atitlan: con solo 322 pixeles positivos en
+    toda la serie, un modelo entrenado alli tiene muy poca senal para
+    aprender un patron generalizable, mientras que un modelo entrenado
+    en Amatitlan aprende un patron ajustado a su propio regimen de alta
+    frecuencia de floraciones, que no aplica al regimen raro de
+    Atitlan.
+
+Conclusion practica: para un sistema operativo de monitoreo, esto
+sugiere que se necesita un modelo (o al menos un recalibrado de
+umbral/hiperparametros) especifico por lago, en vez de un unico modelo
+entrenado en un lago y aplicado directamente al otro.
+"""
+
+
+def imprimir_discusion():
+    print(DISCUSION_GENERALIZACION)
+
+
 if __name__ == "__main__":
     os.makedirs(CARPETA_TABLAS, exist_ok=True)
 
@@ -109,7 +182,13 @@ if __name__ == "__main__":
     print("=== Experimentos de generalizacion entre lagos ===")
     tabla_entre_lagos = experimentos_entre_lagos(df)
 
-    tabla_entre_lagos.to_csv(os.path.join(CARPETA_TABLAS, "generalizacion_entre_lagos.csv"), index=False)
+    print("\n=== Experimentos de referencia: mismo lago (entrenamiento y prueba) ===")
+    tabla_mismo_lago = experimentos_mismo_lago(df)
 
-    print("\n--- Tabla de experimentos entre lagos ---")
-    print(tabla_entre_lagos.to_string(index=False))
+    tabla_completa = pd.concat([tabla_entre_lagos, tabla_mismo_lago], ignore_index=True)
+    tabla_completa.to_csv(os.path.join(CARPETA_TABLAS, "generalizacion_entre_lagos.csv"), index=False)
+
+    print("\n--- Tabla completa de comparacion ---")
+    print(tabla_completa.to_string(index=False))
+
+    imprimir_discusion()
