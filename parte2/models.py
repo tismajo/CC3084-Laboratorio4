@@ -125,6 +125,118 @@ def verificacion_rapida(modelos, X_test, y_test):
     return pd.DataFrame(filas)
 
 
+# ============================================================
+# 4.3 AJUSTE DE HIPERPARAMETROS
+# ============================================================
+# Criterio de seleccion: se optimiza f1-score de la clase positiva
+# (alta_cianobacteria=1) en validacion cruzada. Se elige F1 en vez de
+# accuracy porque, dado el desbalance ~81:1 (Ejercicio 2.4), accuracy
+# es enganosa (un modelo trivial que siempre predice 0 ya obtendria
+# ~98.8% de accuracy); F1 balancea precision y recall de la clase de
+# interes sin descuidar ninguna de las dos por completo (la eleccion
+# final entre precision/recall se discute con criterio ambiental en el
+# Ejercicio 5.3).
+#
+# Por el tamano del conjunto de entrenamiento (~420k filas), la
+# busqueda de hiperparametros se ejecuta sobre una submuestra
+# estratificada (manteniendo la proporcion de clases) para que el
+# tiempo de computo sea manejable; los mejores hiperparametros
+# encontrados se reentrenan despues sobre el conjunto de entrenamiento
+# completo para obtener el modelo final.
+
+from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
+
+TAMANO_SUBMUESTRA_BUSQUEDA = 80_000
+N_ITER_BUSQUEDA = 8
+CV_BUSQUEDA = 3
+
+
+def submuestra_estratificada(X, y, n, random_state=RANDOM_STATE):
+    if n >= len(X):
+        return X, y
+    _, X_sub, _, y_sub = train_test_split(
+        X, y, test_size=n, random_state=random_state, stratify=y
+    )
+    return X_sub, y_sub
+
+
+REJILLAS_HIPERPARAMETROS = {
+    "logistic_regression": {
+        "C": [0.01, 0.1, 1, 10, 100],
+    },
+    "random_forest": {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [None, 10, 20],
+        "min_samples_leaf": [1, 5, 10],
+    },
+    "xgboost": {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.01, 0.1, 0.2],
+    },
+}
+
+
+def construir_estimador_base(nombre, y_train):
+    n_neg = (y_train == 0).sum()
+    n_pos = (y_train == 1).sum()
+    scale_pos_weight = n_neg / n_pos
+
+    if nombre == "logistic_regression":
+        return LogisticRegression(max_iter=2000, class_weight="balanced", random_state=RANDOM_STATE)
+    if nombre == "random_forest":
+        return RandomForestClassifier(class_weight="balanced", random_state=RANDOM_STATE, n_jobs=-1)
+    if nombre == "xgboost":
+        return XGBClassifier(scale_pos_weight=scale_pos_weight, eval_metric="logloss", random_state=RANDOM_STATE, n_jobs=-1)
+    raise ValueError(nombre)
+
+
+def ajustar_hiperparametros(X_train, y_train):
+    """
+    Ejecuta RandomizedSearchCV (scoring="f1") sobre una submuestra
+    estratificada del entrenamiento para cada modelo, y reentrena la
+    mejor configuracion encontrada sobre el conjunto de entrenamiento
+    completo.
+    """
+
+    X_sub, y_sub = submuestra_estratificada(X_train, y_train, TAMANO_SUBMUESTRA_BUSQUEDA)
+    cv = StratifiedKFold(n_splits=CV_BUSQUEDA, shuffle=True, random_state=RANDOM_STATE)
+
+    modelos_finales = {}
+    filas_resumen = []
+
+    for nombre, rejilla in REJILLAS_HIPERPARAMETROS.items():
+        print(f"\nBuscando hiperparametros para {nombre}...")
+        estimador = construir_estimador_base(nombre, y_sub)
+
+        busqueda = RandomizedSearchCV(
+            estimador,
+            param_distributions=rejilla,
+            n_iter=min(N_ITER_BUSQUEDA, np.prod([len(v) for v in rejilla.values()])),
+            scoring="f1",
+            cv=cv,
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+        )
+        busqueda.fit(X_sub, y_sub)
+
+        print(f"Mejores hiperparametros ({nombre}): {busqueda.best_params_}")
+        print(f"Mejor F1 en validacion cruzada (submuestra): {busqueda.best_score_:.4f}")
+
+        modelo_final = construir_estimador_base(nombre, y_train)
+        modelo_final.set_params(**busqueda.best_params_)
+        modelo_final.fit(X_train, y_train)
+
+        modelos_finales[nombre] = modelo_final
+        filas_resumen.append({
+            "modelo": nombre,
+            "mejores_hiperparametros": str(busqueda.best_params_),
+            "f1_cv_submuestra": busqueda.best_score_,
+        })
+
+    return modelos_finales, pd.DataFrame(filas_resumen)
+
+
 if __name__ == "__main__":
     os.makedirs(CARPETA_MODELOS, exist_ok=True)
     os.makedirs(CARPETA_TABLAS, exist_ok=True)
@@ -145,3 +257,12 @@ if __name__ == "__main__":
     resumen_rapido = verificacion_rapida(modelos, X_test, y_test)
     resumen_rapido.to_csv(os.path.join(CARPETA_TABLAS, "verificacion_rapida_modelos_base.csv"), index=False)
     print(f"\nModelos guardados en -> {CARPETA_MODELOS}")
+
+    modelos_finales, resumen_hiperparametros = ajustar_hiperparametros(X_train, y_train)
+
+    for nombre, modelo in modelos_finales.items():
+        joblib.dump(modelo, os.path.join(CARPETA_MODELOS, f"{nombre}_final.joblib"))
+
+    resumen_hiperparametros.to_csv(os.path.join(CARPETA_TABLAS, "hiperparametros_seleccionados.csv"), index=False)
+    print(f"\nModelos finales (ajustados) guardados en -> {CARPETA_MODELOS}")
+    print(resumen_hiperparametros.to_string(index=False))

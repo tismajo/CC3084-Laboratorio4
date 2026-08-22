@@ -1,0 +1,4 @@
+modelo,mejores_hiperparametros,f1_cv_submuestra
+logistic_regression,{'C': 100},0.4803169823299471
+random_forest,"{'n_estimators': 100, 'min_samples_leaf': 1, 'max_depth': None}",0.8538363160936107
+xgboost,"{'n_estimators': 300, 'max_depth': 7, 'learning_rate': 0.1}",0.8536985959156604
