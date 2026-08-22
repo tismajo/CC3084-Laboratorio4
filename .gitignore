@@ -4,4 +4,5 @@ parte2/data_cache/
 parte2/resultados/dataset_pixeles.csv
 parte2/resultados/dataset_con_respuesta.csv
 parte2/resultados/dataset_features.csv
+parte2/resultados/modelos/
 .env
