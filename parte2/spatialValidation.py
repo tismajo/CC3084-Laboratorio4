@@ -119,6 +119,117 @@ def visualizar_bloques(df, nombre_lago, carpeta_salida):
     print(f"[{nombre_lago}] Mapa de bloques guardado -> {ruta}")
 
 
+# ============================================================
+# 6.3 / 6.4 VALIDACION CRUZADA ESPACIAL (GroupKFold por bloque)
+# ============================================================
+# Se comparan dos esquemas de validacion cruzada con 5 folds sobre los
+# MISMOS modelos e hiperparametros (los seleccionados en el Ejercicio
+# 4.3), para que la unica diferencia entre ambos sea como se agrupan
+# las observaciones en cada fold:
+#   - aleatoria: StratifiedKFold, cada fold mezcla observaciones sin
+#     considerar su cercania geografica (observaciones del mismo
+#     bloque/pixel vecino pueden quedar repartidas entre train y test).
+#   - espacial: GroupKFold usando bloque_id como grupo, de modo que
+#     todas las observaciones de un mismo bloque de 1km x 1km quedan
+#     siempre en el mismo lado (entrenamiento o prueba).
+
+from sklearn.model_selection import StratifiedKFold, GroupKFold, cross_validate
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
+
+PREDICTORES = [
+    "ndvi", "ndwi", "B02", "B03", "B08", "B11",
+    "ratio_verde_azul", "brillo_superficial", "indice_turbidez_verde_swir",
+]
+COLUMNA_RESPUESTA = "alta_cianobacteria"
+N_SPLITS_CV = 5
+METRICAS_CV = ["f1", "recall", "precision", "roc_auc"]
+
+
+def construir_modelos_para_cv(y):
+    n_neg = (y == 0).sum()
+    n_pos = (y == 1).sum()
+    scale_pos_weight = n_neg / n_pos
+
+    return {
+        "logistic_regression": LogisticRegression(C=100, max_iter=2000, class_weight="balanced", random_state=42),
+        "random_forest": RandomForestClassifier(
+            n_estimators=100, max_depth=None, min_samples_leaf=1,
+            class_weight="balanced", random_state=42, n_jobs=-1,
+        ),
+        "xgboost": XGBClassifier(
+            n_estimators=300, max_depth=7, learning_rate=0.1,
+            scale_pos_weight=scale_pos_weight, eval_metric="logloss", random_state=42, n_jobs=-1,
+        ),
+    }
+
+
+def validacion_cruzada(df):
+    X = df[PREDICTORES]
+    y = df[COLUMNA_RESPUESTA]
+    grupos = df["bloque_id"]
+
+    modelos = construir_modelos_para_cv(y)
+
+    cv_aleatoria = StratifiedKFold(n_splits=N_SPLITS_CV, shuffle=True, random_state=42)
+    cv_espacial = GroupKFold(n_splits=N_SPLITS_CV)
+
+    filas = []
+    for nombre, modelo in modelos.items():
+        print(f"\nValidacion cruzada aleatoria - {nombre}...")
+        res_aleatoria = cross_validate(modelo, X, y, cv=cv_aleatoria, scoring=METRICAS_CV, n_jobs=1)
+
+        print(f"Validacion cruzada espacial (GroupKFold por bloque) - {nombre}...")
+        res_espacial = cross_validate(modelo, X, y, cv=cv_espacial, groups=grupos, scoring=METRICAS_CV, n_jobs=1)
+
+        for metrica in METRICAS_CV:
+            filas.append({
+                "modelo": nombre,
+                "metrica": metrica,
+                "validacion": "aleatoria",
+                "media": res_aleatoria[f"test_{metrica}"].mean(),
+                "std": res_aleatoria[f"test_{metrica}"].std(),
+            })
+            filas.append({
+                "modelo": nombre,
+                "metrica": metrica,
+                "validacion": "espacial",
+                "media": res_espacial[f"test_{metrica}"].mean(),
+                "std": res_espacial[f"test_{metrica}"].std(),
+            })
+
+    return pd.DataFrame(filas)
+
+
+# ============================================================
+# 6.5 / 6.6 COMPARACION ALEATORIA VS ESPACIAL
+# ============================================================
+
+def comparar_validaciones(tabla_cv):
+    pivote = tabla_cv.pivot_table(index=["modelo", "metrica"], columns="validacion", values="media").reset_index()
+    pivote["diferencia_espacial_menos_aleatoria"] = pivote["espacial"] - pivote["aleatoria"]
+
+    print("\n--- Comparacion validacion aleatoria vs espacial (media entre folds) ---")
+    print(pivote.to_string(index=False))
+
+    print(
+        "\nInterpretacion esperada: la validacion espacial (GroupKFold por "
+        "bloque de 1km) tiende a dar metricas iguales o mas bajas que la "
+        "validacion aleatoria, porque en la aleatoria los pixeles vecinos "
+        "de un mismo pixel de prueba (con valores espectrales casi "
+        "identicos por autocorrelacion espacial) pueden quedar en el "
+        "conjunto de entrenamiento, lo que infla artificialmente el "
+        "desempeno reportado. La validacion espacial obliga al modelo a "
+        "predecir sobre bloques geograficos nunca vistos, lo cual es una "
+        "estimacion mas realista de su capacidad de generalizar a zonas "
+        "nuevas del lago (que es, en la practica, para lo que se usaria "
+        "un modelo de monitoreo)."
+    )
+
+    return pivote
+
+
 if __name__ == "__main__":
     os.makedirs(CARPETA_TABLAS, exist_ok=True)
     os.makedirs(CARPETA_FIGURAS, exist_ok=True)
@@ -137,3 +248,9 @@ if __name__ == "__main__":
     ruta_con_bloques = "parte2/resultados/dataset_con_bloques.csv"
     df.to_csv(ruta_con_bloques, index=False)
     print(f"\nDataset con bloques espaciales guardado -> {ruta_con_bloques}")
+
+    tabla_cv = validacion_cruzada(df)
+    tabla_cv.to_csv(os.path.join(CARPETA_TABLAS, "cv_aleatoria_vs_espacial.csv"), index=False)
+
+    pivote_comparacion = comparar_validaciones(tabla_cv)
+    pivote_comparacion.to_csv(os.path.join(CARPETA_TABLAS, "comparacion_aleatoria_vs_espacial.csv"), index=False)
